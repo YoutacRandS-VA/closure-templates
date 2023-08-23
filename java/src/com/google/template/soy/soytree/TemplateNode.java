@@ -729,8 +729,7 @@ public abstract class TemplateNode extends AbstractBlockCommandNode
       if (headerVar.hasType()) {
         SoyType type = headerVar.type();
         if (!headerVar.isRequired()) {
-          // TODO(b/291132644): Switch to "tryRemoveUndefined".
-          type = SoyTypes.tryRemoveNull(type);
+          type = SoyTypes.tryRemoveUndefined(type);
         }
         sb.append(type);
       } else {

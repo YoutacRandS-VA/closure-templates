@@ -1568,7 +1568,7 @@ final class ExpressionCompiler {
       accumulator =
           accumulateNullSafeDataAccessTail(
               (AccessChainComponentNode) dataAccess, accumulator, nullSafeExit);
-      return accumulator.box().labelEnd(nullSafeExit).asSoyNullish();
+      return accumulator.box().labelEnd(nullSafeExit).asSoyUndefinable();
     }
 
     private static SoyExpression addNullSafetyCheck(SoyExpression baseExpr, Label nullSafeExit) {
@@ -1579,7 +1579,7 @@ final class ExpressionCompiler {
                 @Override
                 protected void doGen(CodeBuilder adapter) {
                   baseExpr.gen(adapter);
-                  BytecodeUtils.coalesceSoyNullishToSoyNull(
+                  BytecodeUtils.coalesceSoyNullishToSoyUndefined(
                       adapter, baseExpr.resultType(), nullSafeExit);
                 }
               })

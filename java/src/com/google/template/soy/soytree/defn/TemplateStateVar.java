@@ -21,7 +21,7 @@ import com.google.template.soy.basetree.CopyState;
 import com.google.template.soy.exprtree.AbstractVarDefn;
 import com.google.template.soy.exprtree.ExprNode;
 import com.google.template.soy.exprtree.ExprRootNode;
-import com.google.template.soy.exprtree.NullNode;
+import com.google.template.soy.exprtree.UndefinedNode;
 import com.google.template.soy.types.SoyType;
 import com.google.template.soy.types.ast.TypeNode;
 import javax.annotation.Nullable;
@@ -41,15 +41,26 @@ public final class TemplateStateVar extends AbstractVarDefn implements TemplateH
   public TemplateStateVar(
       String name,
       @Nullable TypeNode typeNode,
-      ExprNode initialValue, // TODO(b/291132644): Make @Nullable again and default to UNDEFINED.
+      @Nullable ExprNode initialValue,
       @Nullable String desc,
       @Nullable SourceLocation nameLocation,
       SourceLocation sourceLocation) {
     super(name, nameLocation, /* type= */ null);
     this.originalTypeNode = typeNode;
     this.desc = desc;
-    this.initialValue = new ExprRootNode(initialValue);
+    this.initialValue =
+        initialValue == null
+            ? new ExprRootNode(
+                new UndefinedNode(/* Tell formatter to omit. */ SourceLocation.UNKNOWN))
+            : new ExprRootNode(initialValue);
     this.sourceLocation = sourceLocation;
+
+    // Omitted default value means type is actually T|undefined.
+    if (initialValue == null
+        && typeNode != null
+        && !TemplateParam.isAlreadyOptionalType(typeNode)) {
+      typeNode = TemplateParam.getOptionalParamTypeNode(typeNode);
+    }
     this.typeNode = typeNode;
   }
 
@@ -89,7 +100,7 @@ public final class TemplateStateVar extends AbstractVarDefn implements TemplateH
   }
 
   public boolean hasExplicitDefaultValue() {
-    return !(initialValue.getRoot() instanceof NullNode);
+    return !(initialValue.getRoot() instanceof UndefinedNode);
   }
 
   @Override

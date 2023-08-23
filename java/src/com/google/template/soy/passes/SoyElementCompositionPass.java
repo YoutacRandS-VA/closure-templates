@@ -64,7 +64,6 @@ import com.google.template.soy.soytree.TagName;
 import com.google.template.soy.soytree.TemplateNode;
 import com.google.template.soy.soytree.defn.AttrParam;
 import com.google.template.soy.soytree.defn.TemplateParam;
-import com.google.template.soy.types.NullType;
 import com.google.template.soy.types.SanitizedType.AttributesType;
 import com.google.template.soy.types.SanitizedType.StyleType;
 import com.google.template.soy.types.SanitizedType.TrustedResourceUriType;
@@ -73,6 +72,7 @@ import com.google.template.soy.types.SoyType;
 import com.google.template.soy.types.SoyTypes;
 import com.google.template.soy.types.TemplateType;
 import com.google.template.soy.types.TemplateType.Parameter;
+import com.google.template.soy.types.UndefinedType;
 import com.google.template.soy.types.UnionType;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -476,7 +476,7 @@ final class SoyElementCompositionPass implements CompilerFileSetPass {
             nodeIdGen.genId(),
             attr.getSourceLocation(),
             Identifier.create(paramName, unknown),
-            emptyToNull(val));
+            emptyToUndefined(val));
       } else {
         return new CallParamValueNode(
             nodeIdGen.genId(),
@@ -549,16 +549,19 @@ final class SoyElementCompositionPass implements CompilerFileSetPass {
     VarRefNode varRef =
         new VarRefNode("$" + letContentNode.getVar().name(), unknown, letContentNode.getVar());
     return new CallParamValueNode(
-        nodeIdGen.genId(), unknown, Identifier.create(paramName, unknown), emptyToNull(varRef));
+        nodeIdGen.genId(),
+        unknown,
+        Identifier.create(paramName, unknown),
+        emptyToUndefined(varRef));
   }
 
-  private static ExprNode emptyToNull(ExprNode val) {
+  private static ExprNode emptyToUndefined(ExprNode val) {
     var functionNode =
         FunctionNode.newPositional(
             Identifier.create(BuiltinFunction.EMPTY_TO_NULL.getName(), val.getSourceLocation()),
             BuiltinFunction.EMPTY_TO_NULL,
             val.getSourceLocation());
-    functionNode.setType(UnionType.of(NullType.getInstance(), val.getType()));
+    functionNode.setType(UnionType.of(UndefinedType.getInstance(), val.getType()));
     functionNode.addChild(val);
     return functionNode;
   }

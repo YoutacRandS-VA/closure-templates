@@ -37,8 +37,7 @@ import javax.annotation.Nullable;
  * <p>Important: Do not use outside of Soy code (treat as superpackage-private).
  */
 public class TemplateParam extends AbstractVarDefn implements TemplateHeaderVarDefn {
-  // TODO(b/291132644): Switch to "undefined".
-  private static final String TYPE_OF_OPTIONAL_PARAM = "null";
+  private static final String TYPE_OF_OPTIONAL_PARAM = "undefined";
 
   private final TypeNode typeNode;
   private final TypeNode originalTypeNode;
