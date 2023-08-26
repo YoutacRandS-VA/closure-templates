@@ -18,7 +18,7 @@ package com.google.template.soy.jssrc.internal;
 
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
-import static com.google.template.soy.jssrc.dsl.Expressions.LITERAL_NULL;
+import static com.google.template.soy.jssrc.dsl.Expressions.LITERAL_UNDEFINED;
 import static com.google.template.soy.jssrc.dsl.Expressions.ifExpression;
 import static com.google.template.soy.jssrc.internal.JsRuntime.GOOG_ARRAY_MAP;
 import static com.google.template.soy.jssrc.internal.JsRuntime.SOY_CHECK_NOT_NULL;
@@ -28,6 +28,7 @@ import static com.google.template.soy.jssrc.internal.JsRuntime.protoByteStringTo
 import static com.google.template.soy.jssrc.internal.JsRuntime.protoToSanitizedContentConverterFunction;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.ForOverride;
 import com.google.protobuf.Descriptors.FieldDescriptor;
@@ -77,7 +78,7 @@ final class NullSafeAccumulator {
 
   @CanIgnoreReturnValue
   NullSafeAccumulator mapGetAccess(Expression mapKeyCode, boolean nullSafe) {
-    chain.add(FieldAccess.call("get", mapKeyCode).toChainAccess(nullSafe));
+    chain.add(FieldAccess.call("get", ImmutableList.of(mapKeyCode)).toChainAccess(nullSafe));
     return this;
   }
 
@@ -100,8 +101,9 @@ final class NullSafeAccumulator {
    * invoked.
    */
   @CanIgnoreReturnValue
-  NullSafeAccumulator functionCall(boolean nullSafe, Function<Expression, Expression> extender) {
-    chain.add(new FunctionCall(nullSafe, extender));
+  NullSafeAccumulator functionCall(
+      boolean nullSafe, boolean hasNativeNullSafe, Function<Expression, Expression> extender) {
+    chain.add(new FunctionCall(nullSafe, hasNativeNullSafe, extender));
     return this;
   }
 
@@ -142,7 +144,8 @@ final class NullSafeAccumulator {
     }
     ChainAccess link = chain.next();
     Expression result;
-    if (link.nullSafe && !base.isCheap()) {
+    boolean needsWrap = link.nullSafe && !link.hasNativeNullSafe();
+    if (needsWrap && !base.isCheap()) {
       base = generator.declarationBuilder().setRhs(base).build().ref();
     }
 
@@ -153,9 +156,9 @@ final class NullSafeAccumulator {
     newBase = link.extend(newBase);
 
     unpackBuffer.addFirst(link);
-    if (link.nullSafe) {
+    if (needsWrap) {
       result =
-          ifExpression(base.doubleEqualsNull(), LITERAL_NULL)
+          ifExpression(base.doubleEqualsNull(), LITERAL_UNDEFINED)
               .setElse(buildAccessChain(newBase, generator, chain, unpackBuffer))
               .build(generator);
     } else {
@@ -202,6 +205,10 @@ final class NullSafeAccumulator {
      */
     abstract Expression extend(Expression prevTip);
 
+    boolean hasNativeNullSafe() {
+      return true;
+    }
+
     final boolean nullSafe;
 
     ChainAccess(boolean nullSafe) {
@@ -228,17 +235,27 @@ final class NullSafeAccumulator {
 
   private static final class FunctionCall extends ChainAccess {
     private final Function<Expression, Expression> funct;
+    private final boolean hasNativeNullSafe;
 
-    public FunctionCall(boolean nullSafe, Function<Expression, Expression> funct) {
+    public FunctionCall(
+        boolean nullSafe, boolean hasNativeNullSafe, Function<Expression, Expression> funct) {
       super(nullSafe);
+      this.hasNativeNullSafe = hasNativeNullSafe;
       this.funct = funct;
     }
 
     @Override
     Expression extend(Expression prevTip) {
       // Never allow a null method receiver.
-      prevTip = SOY_CHECK_NOT_NULL.call(prevTip);
+      if (!hasNativeNullSafe) {
+        prevTip = SOY_CHECK_NOT_NULL.call(prevTip);
+      }
       return funct.apply(prevTip);
+    }
+
+    @Override
+    boolean hasNativeNullSafe() {
+      return hasNativeNullSafe;
     }
 
     @Override
@@ -258,7 +275,7 @@ final class NullSafeAccumulator {
 
     @Override
     Expression extend(Expression prevTip) {
-      return prevTip.bracketAccess(value);
+      return prevTip.bracketAccess(value, nullSafe);
     }
   }
 
@@ -273,7 +290,7 @@ final class NullSafeAccumulator {
 
     @Override
     Expression extend(Expression prevTip) {
-      return prevTip.dotAccess(id);
+      return prevTip.dotAccess(id, nullSafe);
     }
   }
 
@@ -283,17 +300,17 @@ final class NullSafeAccumulator {
    */
   private static class DotCall extends ChainAccess {
     final String getter;
-    @Nullable final Expression arg;
+    final ImmutableList<Expression> args;
 
-    DotCall(String getter, @Nullable Expression arg, boolean nullSafe) {
+    DotCall(String getter, ImmutableList<Expression> args, boolean nullSafe) {
       super(nullSafe);
       this.getter = getter;
-      this.arg = arg;
+      this.args = args;
     }
 
     @Override
     final Expression extend(Expression prevTip) {
-      return arg == null ? prevTip.dotAccess(getter).call() : prevTip.dotAccess(getter).call(arg);
+      return prevTip.dotAccess(getter, nullSafe).call(args);
     }
   }
 
@@ -310,7 +327,9 @@ final class NullSafeAccumulator {
     Expression extend(Expression prevTip) {
       Expression arg = protoCall.getterArg();
       String getter = protoCall.getter();
-      return arg == null ? prevTip.dotAccess(getter).call() : prevTip.dotAccess(getter).call(arg);
+      return arg == null
+          ? prevTip.dotAccess(getter, nullSafe).call()
+          : prevTip.dotAccess(getter, nullSafe).call(arg);
     }
 
     @Override
@@ -347,8 +366,8 @@ final class NullSafeAccumulator {
       return new AutoValue_NullSafeAccumulator_Id(fieldName);
     }
 
-    static FieldAccess call(String getter, Expression arg) {
-      return new AutoValue_NullSafeAccumulator_Call(getter, arg);
+    static FieldAccess call(String getter, ImmutableList<Expression> args) {
+      return new AutoValue_NullSafeAccumulator_Call(getter, args);
     }
 
     static FieldAccess protoCall(String fieldName, FieldDescriptor desc) {
@@ -376,11 +395,11 @@ final class NullSafeAccumulator {
     abstract String getter();
 
     @Nullable
-    abstract Expression arg();
+    abstract ImmutableList<Expression> args();
 
     @Override
     ChainAccess toChainAccess(boolean nullSafe) {
-      return new DotCall(getter(), arg(), nullSafe);
+      return new DotCall(getter(), args(), nullSafe);
     }
   }
 

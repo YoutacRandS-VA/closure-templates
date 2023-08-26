@@ -33,4 +33,8 @@ public interface SoyJavaScriptSourceFunction extends SoySourceFunction {
    */
   JavaScriptValue applyForJavaScriptSource(
       JavaScriptValueFactory factory, List<JavaScriptValue> args, JavaScriptPluginContext context);
+
+  default boolean hasNativeNullSafe() {
+    return false;
+  }
 }

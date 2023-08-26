@@ -56,6 +56,11 @@ public final class StrEndsWithMethod
   }
 
   @Override
+  public boolean hasNativeNullSafe() {
+    return true;
+  }
+
+  @Override
   public PythonValue applyForPythonSource(
       PythonValueFactory factory, List<PythonValue> args, PythonPluginContext context) {
     return factory.global("runtime.str_ends_with").call(args);

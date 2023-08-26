@@ -59,6 +59,11 @@ public final class JoinFunction
   }
 
   @Override
+  public boolean hasNativeNullSafe() {
+    return true;
+  }
+
+  @Override
   public PythonValue applyForPythonSource(
       PythonValueFactory factory, List<PythonValue> args, PythonPluginContext context) {
     return args.get(1)

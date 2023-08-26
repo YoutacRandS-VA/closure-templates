@@ -55,6 +55,11 @@ public final class LengthFunction extends TypedSoyFunction
   }
 
   @Override
+  public boolean hasNativeNullSafe() {
+    return true;
+  }
+
+  @Override
   public PythonValue applyForPythonSource(
       PythonValueFactory factory, List<PythonValue> args, PythonPluginContext context) {
     return factory.global("len").call(args.get(0));

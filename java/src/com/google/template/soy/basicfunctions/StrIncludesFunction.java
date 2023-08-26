@@ -76,6 +76,11 @@ public final class StrIncludesFunction
   }
 
   @Override
+  public boolean hasNativeNullSafe() {
+    return true;
+  }
+
+  @Override
   public PythonValue applyForPythonSource(
       PythonValueFactory factory, List<PythonValue> args, PythonPluginContext context) {
     if (args.size() == 3) {

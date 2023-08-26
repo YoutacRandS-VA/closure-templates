@@ -96,12 +96,14 @@ public final class JavaScriptValueFactoryImpl extends JavaScriptValueFactory {
       String name,
       SoyJavaScriptSourceFunction fn,
       List<Expression> args,
-      CodeChunk.Generator codeGenerator) {
+      CodeChunk.Generator codeGenerator,
+      boolean useNullSafeBase) {
     JavaScriptValueImpl result;
     try {
       result =
           (JavaScriptValueImpl)
-              fn.applyForJavaScriptSource(this, wrapParams(args), createContext(codeGenerator));
+              fn.applyForJavaScriptSource(
+                  this, wrapParams(args, useNullSafeBase), createContext(codeGenerator));
       if (result == null) {
         report(location, name, fn, NULL_RETURN, fn.getClass().getSimpleName());
         result = ERROR_VALUE;
@@ -225,10 +227,17 @@ public final class JavaScriptValueFactoryImpl extends JavaScriptValueFactory {
     return exprs;
   }
 
-  private static List<JavaScriptValue> wrapParams(List<Expression> params) {
+  private static List<JavaScriptValue> wrapParams(
+      List<Expression> params, boolean useNullSafeBase) {
     List<JavaScriptValue> exprs = new ArrayList<>(params.size());
+    boolean first = true;
     for (Expression e : params) {
-      exprs.add(new JavaScriptValueImpl(e));
+      JavaScriptValueImpl wrapped = new JavaScriptValueImpl(e);
+      if (first) {
+        wrapped.useNullSafe = useNullSafeBase;
+      }
+      exprs.add(wrapped);
+      first = false;
     }
     return exprs;
   }
@@ -236,6 +245,7 @@ public final class JavaScriptValueFactoryImpl extends JavaScriptValueFactory {
   @VisibleForTesting
   static final class JavaScriptValueImpl implements JavaScriptValue {
     @VisibleForTesting final Expression impl;
+    private boolean useNullSafe;
 
     JavaScriptValueImpl(Expression impl) {
       this.impl = checkNotNull(impl);
@@ -264,12 +274,12 @@ public final class JavaScriptValueFactoryImpl extends JavaScriptValueFactory {
     @Override
     public JavaScriptValueImpl invokeMethod(String methodName, JavaScriptValue... args) {
       return new JavaScriptValueImpl(
-          impl.dotAccess(methodName).call(unwrapParams(Arrays.asList(args))));
+          impl.dotAccess(methodName, useNullSafe).call(unwrapParams(Arrays.asList(args))));
     }
 
     @Override
     public JavaScriptValueImpl accessProperty(String ident) {
-      return new JavaScriptValueImpl(impl.dotAccess(ident));
+      return new JavaScriptValueImpl(impl.dotAccess(ident, useNullSafe));
     }
 
     @Override

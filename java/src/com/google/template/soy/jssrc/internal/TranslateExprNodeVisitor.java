@@ -565,15 +565,19 @@ public class TranslateExprNodeVisitor extends AbstractReturningExprNodeVisitor<E
         FieldAccessNode fieldAccess = (FieldAccessNode) dataAccessNode;
         SoySourceFunctionMethod sourceMethod = fieldAccess.getSoyMethod();
         if (sourceMethod != null) {
+          SoyJavaScriptSourceFunction jsFunction =
+              (SoyJavaScriptSourceFunction) sourceMethod.getImpl();
           return accumulator.functionCall(
               nullSafe,
+              jsFunction.hasNativeNullSafe(),
               baseExpr ->
                   javascriptValueFactory.applyFunction(
                       fieldAccess.getSourceLocation(),
                       fieldAccess.getFieldName(),
-                      (SoyJavaScriptSourceFunction) sourceMethod.getImpl(),
+                      jsFunction,
                       ImmutableList.of(baseExpr),
-                      codeGenerator));
+                      codeGenerator,
+                      jsFunction.hasNativeNullSafe() && nullSafe));
         }
 
         FieldAccess access =
@@ -708,15 +712,18 @@ public class TranslateExprNodeVisitor extends AbstractReturningExprNodeVisitor<E
         case BIND:
           return base.functionCall(
               nullSafe,
+              false,
               (baseExpr) ->
                   genCodeForBind(baseExpr, visit(methodCallNode.getParams().get(0)), baseType));
       }
       throw new AssertionError(builtinMethod);
     } else if (soyMethod instanceof SoySourceFunctionMethod) {
-      SoySourceFunctionMethod sourceMethod = (SoySourceFunctionMethod) soyMethod;
+      SoyJavaScriptSourceFunction jsFunction =
+          (SoyJavaScriptSourceFunction) ((SoySourceFunctionMethod) soyMethod).getImpl();
 
       return base.functionCall(
           nullSafe,
+          jsFunction.hasNativeNullSafe(),
           baseExpr -> {
             List<Expression> args = new ArrayList<>();
             args.add(baseExpr);
@@ -724,9 +731,10 @@ public class TranslateExprNodeVisitor extends AbstractReturningExprNodeVisitor<E
             return javascriptValueFactory.applyFunction(
                 methodCallNode.getSourceLocation(),
                 methodCallNode.getMethodName().identifier(),
-                (SoyJavaScriptSourceFunction) sourceMethod.getImpl(),
+                jsFunction,
                 args,
-                codeGenerator);
+                codeGenerator,
+                jsFunction.hasNativeNullSafe() && nullSafe);
           });
     } else {
       throw new AssertionError(soyMethod.getClass());
@@ -1054,7 +1062,8 @@ public class TranslateExprNodeVisitor extends AbstractReturningExprNodeVisitor<E
           node.getStaticFunctionName(),
           (SoyJavaScriptSourceFunction) soyFunction,
           visitChildren(node),
-          codeGenerator);
+          codeGenerator,
+          false);
     } else if (soyFunction instanceof ExternRef) {
       ExternRef ref = (ExternRef) soyFunction;
       return variableMappings.get(ref.name()).call(visitChildren(node));

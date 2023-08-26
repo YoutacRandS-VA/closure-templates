@@ -107,7 +107,7 @@ public final class JavaScriptValueFactoryImplTest {
   static Expression applyFunction(SoyJavaScriptSourceFunction fn, Expression... args) {
     return new JavaScriptValueFactoryImpl(BidiGlobalDir.LTR, ErrorReporter.exploding())
         .applyFunction(
-            SourceLocation.UNKNOWN, "foo", fn, ImmutableList.copyOf(args), newGenerator());
+            SourceLocation.UNKNOWN, "foo", fn, ImmutableList.copyOf(args), newGenerator(), false);
   }
 
   static CodeChunk.Generator newGenerator() {
