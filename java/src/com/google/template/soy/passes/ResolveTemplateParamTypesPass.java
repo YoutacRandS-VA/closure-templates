@@ -81,7 +81,7 @@ final class ResolveTemplateParamTypesPass implements CompilerFilePass {
               && !SoyTypes.containsKinds(paramType, ImmutableSet.of(Kind.ANY, Kind.UNKNOWN))
               && param.isExplicitlyOptional()
                   != isAlreadyOptionalType(param.getOriginalTypeNode())) {
-            errorReporter.warn(param.getSourceLocation(), OPTIONAL_AND_NULLABLE_DISAGREE);
+            errorReporter.report(param.getSourceLocation(), OPTIONAL_AND_NULLABLE_DISAGREE);
           }
         } else if (disableAllTypeChecking) {
           // If there's no type node, this is a default parameter. Normally, we'd set the type on
